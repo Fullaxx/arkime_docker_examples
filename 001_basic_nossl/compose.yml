@@ -1,0 +1,90 @@
+#volumes:
+#  opensearch-data:
+
+services:
+  db:
+    image: opensearchproject/opensearch:latest
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    environment:
+      - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
+    ports:
+      - "172.17.0.1:9200:9200"
+#      - "9300:9300"
+#      - "9600:9600"
+#      - "9650:9650"
+    volumes:
+#      - opensearch-data:/usr/share/opensearch/data
+      - ./opensearch/data:/usr/share/opensearch/data
+      - ./opensearch/opensearch.yml:/usr/share/opensearch/config/opensearch.yml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+      start_period: 15s
+
+  adbinit:
+    image: ghcr.io/arkime/arkime/arkime:v5-latest
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+#    volumes:
+#      - ./arkime/etc:/opt/arkime/etc
+    command: /opt/arkime/db/db.pl http://172.17.0.1:9200 init --ifneeded
+
+  viewer:
+    image: ghcr.io/arkime/arkime/arkime:v5-latest
+    depends_on:
+      db:
+        condition: service_healthy
+      adbinit:
+        condition: service_completed_successfully
+#    environment:
+#      - NODE_TYPE=viewer
+#      - RUN_IN_FOREGROUND=1
+    ports:
+      - "8005:8005"
+    volumes:
+      - ./arkime/etc:/opt/arkime/etc
+    command: /opt/arkime/bin/docker.sh viewer
+
+  capture:
+    image: ghcr.io/arkime/arkime/arkime:v5-latest
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    privileged: true       # allows packet capture on eth0
+    network_mode: "host"   # needed to access host network interface
+    depends_on:
+      db:
+        condition: service_healthy
+      adbinit:
+        condition: service_completed_successfully
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+#    environment:
+#      - NODE_TYPE=capture
+#      - RUN_IN_FOREGROUND=1
+    volumes:
+      - ./arkime/pcap:/opt/arkime/raw
+      - ./arkime/etc:/opt/arkime/etc
+    command: /opt/arkime/bin/docker.sh capture --update-geo
+
+  cont3xt:
+    image: ghcr.io/arkime/arkime/arkime:v5-latest
+    depends_on:
+      db:
+        condition: service_healthy
+      adbinit:
+        condition: service_completed_successfully
+    ports:
+      - "3218:3218"
+    volumes:
+      - ./arkime/etc:/opt/arkime/etc
+    command: /opt/arkime/bin/docker.sh cont3xt
