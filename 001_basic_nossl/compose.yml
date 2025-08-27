@@ -50,6 +50,7 @@ services:
       - "8005:8005"
     volumes:
       - ./arkime/etc:/opt/arkime/etc
+      - ./arkime/pcap:/opt/arkime/raw
     command: /opt/arkime/bin/docker.sh viewer
 
   capture:
@@ -72,8 +73,8 @@ services:
 #      - NODE_TYPE=capture
 #      - RUN_IN_FOREGROUND=1
     volumes:
-      - ./arkime/pcap:/opt/arkime/raw
       - ./arkime/etc:/opt/arkime/etc
+      - ./arkime/pcap:/opt/arkime/raw
     command: /opt/arkime/bin/docker.sh capture --update-geo
 
   cont3xt:
